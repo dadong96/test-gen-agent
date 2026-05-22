@@ -1,0 +1,27 @@
+[build-system]
+requires = ["setuptools>=68.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "test-gen-agent"
+version = "1.0.0"
+description = "Multi-agent system for automated JUnit 5 test generation from PRD + Swagger + Java AST"
+requires-python = ">=3.11"
+dependencies = [
+    "anthropic>=0.39.0",
+    "pyyaml>=6.0",
+    "tree-sitter>=0.22.0",
+    "tree-sitter-java>=0.21.0",
+    "jinja2>=3.1.0",
+    "python-dotenv>=1.0.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.4.0",
+    "pytest-cov>=4.1.0",
+    "pytest-asyncio>=0.23.0",
+]
+
+[project.scripts]
+test-gen = "src.cli:main"
