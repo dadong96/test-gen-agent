@@ -1,54 +1,54 @@
 # Test Gen Agent
 
-AI-driven multi-agent system for automated JUnit 5 test generation from PRD documents, Swagger/OpenAPI specs, and Java source code AST, with a coverage-based feedback loop.
+基于多 Agent 协作的端到端测试用例自动生成系统。从 PRD 需求文档 + Swagger 接口文档 + Java 源码 AST 自动生成 JUnit 5 测试用例，并通过覆盖率闭环持续补充未覆盖分支。
 
-## Architecture
+## 系统架构
 
 ```
 ┌──────────────────────────────────────────────────────────────────────┐
-│                              CLI / CI                                │
-│                   (python -m src.cli generate ./project)             │
+│                           CLI / CI 入口                              │
+│                (python -m src.cli generate ./project)                │
 └───────────────────────────────┬──────────────────────────────────────┘
                                 │
                     ┌───────────▼───────────┐
                     │     Orchestrator       │
-                    │  Coordinates 4-agent   │
-                    │  pipeline with retry   │
+                    │   协调 4 Agent 流水线   │
+                    │   管理覆盖率闭环重试    │
                     └───┬────┬────┬────┬────┘
                         │    │    │    │
          ┌──────────────▼┐ ┌▼────▼┐ ┌▼────────────┐
          │  Parser Agent │ │Generator│ │Optimizer  │
          │               │ │ Agent  │ │  Agent     │
-         │ · PRD parsing │ │ · AST  │ │ · Dedup    │
-         │ · Swagger     │ │ · Gen  │ │ · Merge    │
-         │ · Rules       │ │ · JUnit│ │ · Priority │
+         │ · PRD 解析    │ │ · AST  │ │ · 去重     │
+         │ · Swagger 解析│ │ · 生成 │ │ · 合并     │
+         │ · 业务规则提取│ │ · JUnit│ │ · 优先级   │
          └───────────────┘ └───────┘ └────────────┘
                                        │
                               ┌────────▼────────┐
                               │  Runner Agent    │
-                              │ · mvn/gradle     │
-                              │ · JaCoCo report  │
-                              │ · Uncovered →    │
-                              │   back to Gen    │
+                              │ · mvn/gradle 执行│
+                              │ · JaCoCo 覆盖率  │
+                              │ · 未覆盖 →       │
+                              │   回传 Generator │
                               └─────────────────┘
 ```
 
-### 4-Agent Pipeline
+### 四 Agent 流水线
 
-| Stage | Agent | Role | Output |
-|-------|-------|------|--------|
-| 1 | **Parser** | Extract business rules from PRD + Swagger | `RequirementSpec` |
-| 2 | **Generator** | Generate JUnit 5 tests from spec + AST | `TestCase[]` |
-| 3 | **Optimizer** | Deduplicate, merge, prioritize tests | Optimized `TestCase[]` |
-| 4 | **Runner** | Execute tests, parse JaCoCo coverage | Coverage reports + retry signal |
+| 阶段 | Agent | 职责 | 输出 |
+|------|-------|------|------|
+| 1 | **Parser** | 从 PRD + Swagger 提取业务规则和接口定义 | `RequirementSpec` |
+| 2 | **Generator** | 结合 AST + 需求规格生成 JUnit 5 测试用例 | `TestCase[]` |
+| 3 | **Optimizer** | 去重、合并相似用例、标注优先级 | 优化后的 `TestCase[]` |
+| 4 | **Runner** | 执行测试、解析 JaCoCo 覆盖率报告 | 覆盖率报告 + 重试信号 |
 
-### Coverage Feedback Loop
+### 覆盖率闭环
 
-When branch coverage falls below the threshold, the Runner feeds uncovered branches back to the Generator for supplementary test generation. This loop runs up to 3 rounds with increasing thresholds.
+当分支覆盖率低于阈值时，Runner 将未覆盖的分支信息回传给 Generator，触发补充生成。最多重试 3 轮，每轮递增覆盖率阈值。
 
-## Quick Start
+## 快速开始
 
-### 1. Install
+### 1. 安装
 
 ```bash
 git clone https://github.com/dadong96/test-gen-agent.git
@@ -56,36 +56,36 @@ cd test-gen-agent
 pip install -e ".[dev]"
 ```
 
-### 2. Configure API Key
+### 2. 配置 API Key
 
 ```bash
 cp .env.example .env
-# Edit .env and add your ANTHROPIC_API_KEY or OPENAI_API_KEY
+# 编辑 .env，填入 ANTHROPIC_API_KEY 或 OPENAI_API_KEY
 ```
 
-### 3. Generate Tests
+### 3. 生成测试用例
 
 ```bash
-# Full pipeline: parse docs → generate tests → run → coverage loop
+# 完整流水线：解析文档 → 生成测试 → 执行 → 覆盖率闭环
 python -m src.cli generate \
   --project ./examples/sample_project \
   --prd ./examples/sample_prd.md \
   --swagger ./examples/sample_swagger.json
 
-# Parse docs only (dry run)
+# 仅解析文档（dry run）
 python -m src.cli generate \
   --project ./my-java-project \
   --prd ./docs/prd.md \
   --dry-run
 
-# Generate without executing tests
+# 生成测试但不执行
 python -m src.cli generate \
   --project ./my-java-project \
   --prd ./docs/prd.md \
   --swagger ./docs/swagger.json \
   --no-run
 
-# Custom coverage threshold and retry rounds
+# 自定义覆盖率阈值和重试轮数
 python -m src.cli generate \
   --project ./my-java-project \
   --prd ./docs/prd.md \
@@ -94,69 +94,69 @@ python -m src.cli generate \
   --max-rounds 3
 ```
 
-## CLI Options
+## CLI 参数
 
-| Option | Default | Description |
-|--------|---------|-------------|
-| `--project` | (required) | Path to the Java project |
-| `--prd` | (required) | Path to the PRD document (Markdown) |
-| `--swagger` | None | Path to the Swagger/OpenAPI spec (JSON) |
-| `--coverage-threshold` | 0.70 | Target branch coverage threshold |
-| `--max-rounds` | 3 | Maximum coverage retry rounds |
-| `--no-run` | false | Generate tests but skip execution |
-| `--dry-run` | false | Parse docs only, no test generation |
+| 参数 | 默认值 | 说明 |
+|------|--------|------|
+| `--project` | （必填） | Java 项目路径 |
+| `--prd` | （必填） | PRD 需求文档路径（Markdown） |
+| `--swagger` | 无 | Swagger/OpenAPI 接口文档路径（JSON） |
+| `--coverage-threshold` | 0.70 | 目标分支覆盖率阈值 |
+| `--max-rounds` | 3 | 最大覆盖率重试轮数 |
+| `--no-run` | false | 仅生成测试，不执行 |
+| `--dry-run` | false | 仅解析文档，不生成测试 |
 
-## Configuration
+## 环境变量
 
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `ANTHROPIC_API_KEY` | — | Anthropic API key for Claude |
-| `ANTHROPIC_MODEL` | claude-sonnet-4-6-20250514 | Claude model to use |
-| `OPENAI_API_KEY` | — | OpenAI API key (fallback) |
-| `OPENAI_BASE_URL` | https://api.openai.com/v1 | OpenAI-compatible endpoint |
-| `COVERAGE_THRESHOLD_DEFAULT` | 0.70 | Default branch coverage target |
-| `COVERAGE_THRESHOLD_INCREMENT` | 0.10 | Threshold increase per retry round |
-| `MAX_COVERAGE_ROUNDS` | 3 | Maximum coverage feedback loops |
-| `MAX_FILES_PER_RUN` | 50 | Max Java files to process per run |
+| 变量名 | 默认值 | 说明 |
+|--------|--------|------|
+| `ANTHROPIC_API_KEY` | — | Anthropic API Key（Claude） |
+| `ANTHROPIC_MODEL` | claude-sonnet-4-6-20250514 | 使用的 Claude 模型 |
+| `OPENAI_API_KEY` | — | OpenAI API Key（备选） |
+| `OPENAI_BASE_URL` | https://api.openai.com/v1 | OpenAI 兼容接口地址 |
+| `COVERAGE_THRESHOLD_DEFAULT` | 0.70 | 默认分支覆盖率目标 |
+| `COVERAGE_THRESHOLD_INCREMENT` | 0.10 | 每轮重试递增的阈值 |
+| `MAX_COVERAGE_ROUNDS` | 3 | 最大覆盖率闭环轮数 |
+| `MAX_FILES_PER_RUN` | 50 | 单次最多处理的 Java 文件数 |
 
-## Project Structure
+## 项目结构
 
 ```
 test-gen-agent/
 ├── config/
-│   └── settings.py              # Global configuration
+│   └── settings.py              # 全局配置
 ├── src/
-│   ├── main.py                  # Programmatic entry point
-│   ├── cli.py                   # CLI interface
+│   ├── main.py                  # 编程入口
+│   ├── cli.py                   # CLI 命令行
 │   ├── agents/
-│   │   ├── base.py              # Base agent class
-│   │   ├── parser_agent.py      # PRD + Swagger parsing
-│   │   ├── generator_agent.py   # Test case generation
-│   │   ├── optimizer_agent.py   # Dedup + prioritization
-│   │   └── runner_agent.py      # Test execution + coverage
+│   │   ├── base.py              # Agent 基类
+│   │   ├── parser_agent.py      # PRD + Swagger 文档解析
+│   │   ├── generator_agent.py   # 测试用例生成
+│   │   ├── optimizer_agent.py   # 去重 + 优先级排序
+│   │   └── runner_agent.py      # 测试执行 + 覆盖率解析
 │   ├── core/
-│   │   ├── orchestrator.py      # Pipeline coordinator
-│   │   ├── llm_client.py        # LLM API client
-│   │   ├── ast_parser.py        # Java AST (tree-sitter)
-│   │   ├── coverage_parser.py   # JaCoCo CSV parser
-│   │   ├── build_executor.py    # Maven/Gradle runner
-│   │   └── types.py             # Shared data types
+│   │   ├── orchestrator.py      # 流水线协调器（含闭环逻辑）
+│   │   ├── llm_client.py        # LLM API 客户端
+│   │   ├── ast_parser.py        # Java AST 解析（tree-sitter）
+│   │   ├── coverage_parser.py   # JaCoCo CSV 覆盖率解析
+│   │   ├── build_executor.py    # Maven/Gradle 构建执行
+│   │   └── types.py             # 共享数据结构
 │   ├── generators/
-│   │   └── junit_writer.py      # JUnit 5 file writer
+│   │   └── junit_writer.py      # JUnit 5 文件生成器（Jinja2）
 │   └── utils/
-│       ├── file_utils.py        # File helpers
-│       └── logger.py            # Logging setup
+│       ├── file_utils.py        # 文件工具函数
+│       └── logger.py            # 日志配置
 ├── templates/
-│   └── junit5_template.java     # JUnit 5 Jinja2 template
-├── tests/                       # Test suite
+│   └── junit5_template.java     # JUnit 5 测试文件模板
+├── tests/                       # 测试套件
 ├── examples/
-│   ├── sample_prd.md            # Example PRD
-│   ├── sample_swagger.json      # Example OpenAPI spec
-│   └── sample_project/          # Example Java project
+│   ├── sample_prd.md            # 示例 PRD 文档
+│   ├── sample_swagger.json      # 示例 OpenAPI 接口文档
+│   └── sample_project/          # 示例 Java 项目（OrderService）
 └── pyproject.toml
 ```
 
-## Programmatic Usage
+## 编程方式调用
 
 ```python
 from src.main import run_test_generation
@@ -169,23 +169,23 @@ async def main():
         swagger_path="./docs/swagger.json",
         coverage_threshold=0.8,
     )
-    print(f"Generated {len(result.generated_tests)} tests")
-    print(f"Status: {result.status}")
+    print(f"生成了 {len(result.generated_tests)} 个测试用例")
+    print(f"状态: {result.status}")
 
 asyncio.run(main())
 ```
 
-## Tech Stack
+## 技术栈
 
-| Component | Choice | Purpose |
-|-----------|--------|---------|
-| Agent Orchestration | Python asyncio | Multi-agent pipeline |
-| LLM | Anthropic Claude / OpenAI | Test generation + analysis |
-| Java AST | tree-sitter-java | Source code parsing |
-| Test Execution | Maven/Gradle subprocess | Running generated tests |
-| Coverage | JaCoCo CSV parsing | Coverage feedback loop |
-| Template Engine | Jinja2 | JUnit 5 file generation |
+| 组件 | 选型 | 用途 |
+|------|------|------|
+| Agent 编排 | Python asyncio | 多 Agent 流水线协调 |
+| LLM | Anthropic Claude / OpenAI | 测试生成 + 文档分析 |
+| Java AST | tree-sitter-java | Java 源码结构解析 |
+| 测试执行 | subprocess → mvn/gradle | 运行生成的测试 |
+| 覆盖率 | JaCoCo CSV 解析 | 覆盖率反馈闭环 |
+| 模板引擎 | Jinja2 | JUnit 5 文件生成 |
 
-## License
+## 开源协议
 
 MIT
