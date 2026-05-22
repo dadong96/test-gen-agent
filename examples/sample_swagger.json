@@ -1,0 +1,29 @@
+{
+  "openapi": "3.0.0",
+  "info": {"title": "Order Service API", "version": "1.0.0"},
+  "paths": {
+    "/api/orders": {
+      "post": {
+        "summary": "Create a new order",
+        "parameters": [
+          {"name": "userId", "in": "query", "required": true, "schema": {"type": "string"}, "description": "User ID"},
+          {"name": "amount", "in": "query", "required": true, "schema": {"type": "number"}, "description": "Order amount"}
+        ],
+        "responses": {
+          "200": {"description": "Order created successfully"},
+          "400": {"description": "Invalid input"},
+          "409": {"description": "Duplicate order"}
+        }
+      },
+      "get": {
+        "summary": "Get orders for a user",
+        "parameters": [
+          {"name": "userId", "in": "query", "required": true, "schema": {"type": "string"}}
+        ],
+        "responses": {
+          "200": {"description": "List of orders"}
+        }
+      }
+    }
+  }
+}
