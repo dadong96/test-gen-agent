@@ -95,8 +95,9 @@ def _parse_method(node, source: bytes) -> MethodInfo:
 
 def parse_java_source(source: str) -> JavaClassInfo:
     """Parse Java source code and extract class info."""
+    src_bytes = source.encode("utf-8")
     parser = Parser(JAVA_LANGUAGE)
-    tree = parser.parse(source.encode("utf-8"))
+    tree = parser.parse(src_bytes)
     root = tree.root_node
 
     class_name = ""
@@ -110,17 +111,14 @@ def parse_java_source(source: str) -> JavaClassInfo:
         if child.type == "package_declaration":
             for c in child.children:
                 if c.type == "scoped_identifier":
-                    package = _get_text(c, source.encode("utf-8"))
+                    package = _get_text(c, src_bytes)
 
     # Imports
     for child in root.children:
         if child.type == "import_declaration":
             for c in child.children:
                 if c.type == "scoped_identifier":
-                    imports.append(_get_text(c, source.encode("utf-8")))
-
-    # Class declaration
-    src_bytes = source.encode("utf-8")
+                    imports.append(_get_text(c, src_bytes))
     for child in root.children:
         if child.type in ("class_declaration", "record_declaration"):
             for c in child.children:

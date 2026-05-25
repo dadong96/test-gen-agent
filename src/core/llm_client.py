@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import logging
 import time
 from typing import Any
 
@@ -14,6 +15,12 @@ from config.settings import (
     OPENAI_BASE_URL,
     OPENAI_MODEL,
 )
+
+logger = logging.getLogger(__name__)
+
+MAX_RETRIES = 3
+RETRY_BACKOFF_BASE = 2  # exponential backoff: 2s, 4s, 8s
+RETRYABLE_STATUS_CODES = {429, 500, 502, 503}
 
 
 def _make_anthropic_client():
@@ -58,18 +65,8 @@ class LLMClient:
     def model(self) -> str:
         return self._model
 
-    def chat(
-        self,
-        messages: list[dict],
-        system_prompt: str | None = None,
-        max_tokens: int | None = None,
-        temperature: float = 0.2,
-        **kwargs,
-    ) -> str:
-        """Send a chat request and return the assistant's text response."""
-        max_tokens = max_tokens or MAX_TOKENS_PER_ANALYSIS
-        start = time.monotonic()
-
+    def _call_api(self, messages, system_prompt, max_tokens, temperature, kwargs):
+        """Single API call attempt. Returns (text, input_tokens, output_tokens)."""
         if self._provider == "anthropic":
             response = self._client.messages.create(
                 model=self._model,
@@ -95,12 +92,40 @@ class LLMClient:
             usage = response.usage
             input_tokens = getattr(usage, "prompt_tokens", 0)
             output_tokens = getattr(usage, "completion_tokens", 0)
+        return text, input_tokens, output_tokens
 
-        self.total_tokens_input += input_tokens
-        self.total_tokens_output += output_tokens
-        self.call_count += 1
+    def chat(
+        self,
+        messages: list[dict],
+        system_prompt: str | None = None,
+        max_tokens: int | None = None,
+        temperature: float = 0.2,
+        **kwargs,
+    ) -> str:
+        """Send a chat request and return the assistant's text response."""
+        max_tokens = max_tokens or MAX_TOKENS_PER_ANALYSIS
 
-        return text
+        last_exc = None
+        for attempt in range(MAX_RETRIES):
+            try:
+                text, input_tokens, output_tokens = self._call_api(
+                    messages, system_prompt, max_tokens, temperature, kwargs,
+                )
+                self.total_tokens_input += input_tokens
+                self.total_tokens_output += output_tokens
+                self.call_count += 1
+                return text
+            except Exception as exc:
+                last_exc = exc
+                status = getattr(exc, "status_code", None) or getattr(exc, "status", None)
+                if status not in RETRYABLE_STATUS_CODES and attempt == 0:
+                    raise
+                wait = RETRY_BACKOFF_BASE ** attempt
+                logger.warning("LLM call failed (attempt %d/%d, status=%s): %s — retrying in %ds",
+                               attempt + 1, MAX_RETRIES, status, exc, wait)
+                time.sleep(wait)
+
+        raise RuntimeError(f"LLM call failed after {MAX_RETRIES} retries") from last_exc
 
     def chat_json(
         self,
@@ -125,7 +150,11 @@ class LLMClient:
             if raw.endswith("```"):
                 raw = raw[:-3]
             raw = raw.strip()
-        return json.loads(raw)
+        try:
+            return json.loads(raw)
+        except json.JSONDecodeError as exc:
+            logger.error("Failed to parse LLM response as JSON: %s\nRaw response (first 500 chars): %s", exc, raw[:500])
+            raise ValueError(f"LLM returned invalid JSON: {exc}") from exc
 
     def token_summary(self) -> dict:
         return {

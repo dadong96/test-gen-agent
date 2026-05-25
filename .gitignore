@@ -15,13 +15,28 @@ env/
 # IDE
 .idea/
 .vscode/
+*.swp
+*~
 
 # Environment
 .env
+.env.local
+.env.*
 
 # Output
 output/
+*.log
+
+# Coverage
+.coverage
+htmlcov/
+coverage.xml
+
+# Type checkers / linters
+.mypy_cache/
+.ruff_cache/
 
 # OS
 .DS_Store
 Thumbs.db
+*.tmp

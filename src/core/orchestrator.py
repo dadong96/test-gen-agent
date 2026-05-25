@@ -177,7 +177,9 @@ class Orchestrator:
 
             result.generated_tests = all_test_cases
             result.coverage_reports = all_coverage
-            result.status = "success"
+            result.status = "success" if all_test_cases else "no_tests"
+            if not all_test_cases:
+                result.error = "No tests were successfully generated"
 
         except Exception as e:
             self.logger.exception("[pipeline] Pipeline failed")

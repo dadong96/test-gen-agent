@@ -10,7 +10,7 @@ from pathlib import Path
 from src.main import run_test_generation
 
 
-def parse_args():
+def _build_parser():
     parser = argparse.ArgumentParser(
         description="AI-powered JUnit 5 test case generator with coverage feedback loop",
     )
@@ -25,7 +25,12 @@ def parse_args():
     gen.add_argument("--no-run", action="store_true", help="Generate tests but do not execute them")
     gen.add_argument("--dry-run", action="store_true", help="Parse docs only, do not generate tests")
 
-    return parser.parse_args()
+    return parser
+
+
+def parse_args():
+    parser = _build_parser()
+    return parser, parser.parse_args()
 
 
 def validate_paths(args) -> bool:
@@ -48,11 +53,11 @@ def validate_paths(args) -> bool:
 
 
 async def async_main():
-    args = parse_args()
+    parser, args = parse_args()
 
     if args.command is None:
-        parse_args()
-        return
+        parser.print_help()
+        sys.exit(1)
 
     if args.command == "generate":
         if not validate_paths(args):

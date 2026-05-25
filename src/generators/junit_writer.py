@@ -33,7 +33,7 @@ class JUnitWriter:
 
         written_files = []
         for class_name, cases in by_class.items():
-            package = self._derive_package(class_name)
+            package = cases[0].package if cases[0].package else self._derive_package(class_name)
             imports = self._collect_imports(cases)
 
             content = self.template.render(
