@@ -2,6 +2,14 @@
 
 基于多 Agent 协作的端到端测试用例自动生成系统。从 PRD 需求文档 + Swagger 接口文档 + Java 源码 AST 自动生成 JUnit 5 测试用例，并通过覆盖率闭环持续补充未覆盖分支。
 
+## 核心特性
+
+- **多 Agent 协作** — Parser / Generator / Optimizer / Runner 四阶段流水线
+- **覆盖率闭环** — 未覆盖分支自动回传，最多 3 轮迭代补充用例
+- **AST 驱动** — 基于 tree-sitter-java 解析源码结构，精准定位方法签名
+- **LLM 容错** — 指数退避重试 + JSON 解析诊断，保障生成稳定性
+- **双构建支持** — 自动识别 Maven / Gradle 项目并执行测试
+
 ## 系统架构
 
 ```
